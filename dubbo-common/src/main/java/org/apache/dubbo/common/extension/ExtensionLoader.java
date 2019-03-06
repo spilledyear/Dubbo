@@ -59,6 +59,9 @@ import java.util.regex.Pattern;
  * @see org.apache.dubbo.common.extension.Activate
  */
 public class ExtensionLoader<T> {
+    /**
+     * 判断包装类：实现类里，是否有，参数是接口类型的（比如 com.alibaba.dubbo.rpc.Protocol类型，并且1个参数）的构造函数，表示它是个接口包装类
+     */
 
     private static final Logger logger = LoggerFactory.getLogger(ExtensionLoader.class);
 
@@ -70,27 +73,40 @@ public class ExtensionLoader<T> {
 
     private static final Pattern NAME_SEPARATOR = Pattern.compile("\\s*[,]+\\s*");
 
+    // 所有ExtensionLoader实例共享，缓存 对应扩展接口：ExtensionLoader实例
     private static final ConcurrentMap<Class<?>, ExtensionLoader<?>> EXTENSION_LOADERS = new ConcurrentHashMap<Class<?>, ExtensionLoader<?>>();
 
+    // 所有ExtensionLoader实例共享，缓存 对应实现类class对象：对应的实现类实例
     private static final ConcurrentMap<Class<?>, Object> EXTENSION_INSTANCES = new ConcurrentHashMap<Class<?>, Object>();
 
     // ==============================
 
+    // 扩展接口Class对象
     private final Class<?> type;
 
     private final ExtensionFactory objectFactory;
 
+    // 缓存 实现类Class对象：实现类标识
     private final ConcurrentMap<Class<?>, String> cachedNames = new ConcurrentHashMap<Class<?>, String>();
 
+    // 缓存当前扩展下所有实现类的 Class对象
     private final Holder<Map<String, Class<?>>> cachedClasses = new Holder<Map<String, Class<?>>>();
 
+    // 缓存带有@Active注解的实现类，实现类标识：实现类Class对象
     private final Map<String, Object> cachedActivates = new ConcurrentHashMap<String, Object>();
+
+    // 缓存 实现类标识：Holder，因为种扩展都对应一个ExtensionLoader实例，所以通过实现类标识可以区分实现类
     private final ConcurrentMap<String, Holder<Object>> cachedInstances = new ConcurrentHashMap<String, Holder<Object>>();
+
+    // 缓存 带有@Adaptive注解的实现类的实例，因为每种扩展只能有一个实现类带有@Adaptive注解
     private final Holder<Object> cachedAdaptiveInstance = new Holder<Object>();
+
+    // 缓存 带有@Adaptive注解的实现类Class对象，因为每种扩展只能有一个实现类带有@Adaptive注解
     private volatile Class<?> cachedAdaptiveClass = null;
     private String cachedDefaultName;
     private volatile Throwable createAdaptiveInstanceError;
 
+    // 缓存 包装类 实现类里参数是接口类型的(如 com.alibaba.dubbo.rpc.Protocol类型，并且只有1个参数)的构造函数，表示它是个接口包装类
     private Set<Class<?>> cachedWrapperClasses;
 
     private Map<String, IllegalStateException> exceptions = new ConcurrentHashMap<String, IllegalStateException>();
@@ -341,6 +357,7 @@ public class ExtensionLoader<T> {
             synchronized (holder) {
                 instance = holder.get();
                 if (instance == null) {
+                    // 根据扩展名，获取具体扩展实例
                     instance = createExtension(name);
                     holder.set(instance);
                 }
@@ -516,17 +533,24 @@ public class ExtensionLoader<T> {
 
     @SuppressWarnings("unchecked")
     private T createExtension(String name) {
+        // 先从当前ExtensionLoader实例中的缓存中获取Class对象，如果没有就加在SPI相关文件
         Class<?> clazz = getExtensionClasses().get(name);
         if (clazz == null) {
             throw findException(name);
         }
         try {
+            // 同步到静态缓存
             T instance = (T) EXTENSION_INSTANCES.get(clazz);
             if (instance == null) {
                 EXTENSION_INSTANCES.putIfAbsent(clazz, clazz.newInstance());
                 instance = (T) EXTENSION_INSTANCES.get(clazz);
             }
+
+            // 完成接口实现类依赖注入，依赖组件先从SPI机制构造查找，再从Spring容器查找（完成第2步）
             injectExtension(instance);
+
+            // 如果这些实现类有wrapper类，当前实例instance，注入到包装类，包装类有多个，依次层层，循环构造注入；
+            // 最后返回的是，最后一个包装类实例，这也是dubbo的aop实现机制
             Set<Class<?>> wrapperClasses = cachedWrapperClasses;
             if (wrapperClasses != null && !wrapperClasses.isEmpty()) {
                 for (Class<?> wrapperClass : wrapperClasses) {
@@ -544,6 +568,7 @@ public class ExtensionLoader<T> {
         try {
             if (objectFactory != null) {
                 for (Method method : instance.getClass().getMethods()) {
+                    // 获取所有public类型，并且只有一个参数的以set开头的方法
                     if (method.getName().startsWith("set")
                             && method.getParameterTypes().length == 1
                             && Modifier.isPublic(method.getModifiers())) {
@@ -558,9 +583,13 @@ public class ExtensionLoader<T> {
                             continue;
                         }
                         try {
+                            // 构造驼峰命名法，得到该set方法的参数的类型，即：要注入的对应类型
                             String property = method.getName().length() > 3 ? method.getName().substring(3, 4).toLowerCase() + method.getName().substring(4) : "";
+
+                            // 获取要注入对应的实例
                             Object object = objectFactory.getExtension(pt, property);
                             if (object != null) {
+                                // 执行set方法，完成注入
                                 method.invoke(instance, object);
                             }
                         } catch (Exception e) {
@@ -587,11 +616,13 @@ public class ExtensionLoader<T> {
     }
 
     private Map<String, Class<?>> getExtensionClasses() {
+        // 从缓存中获取
         Map<String, Class<?>> classes = cachedClasses.get();
         if (classes == null) {
             synchronized (cachedClasses) {
                 classes = cachedClasses.get();
                 if (classes == null) {
+                    // 加载SPI相关文件
                     classes = loadExtensionClasses();
                     cachedClasses.set(classes);
                 }
@@ -603,10 +634,12 @@ public class ExtensionLoader<T> {
     // synchronized in getExtensionClasses
     private Map<String, Class<?>> loadExtensionClasses() {
         final SPI defaultAnnotation = type.getAnnotation(SPI.class);
+        // 判断是否有@SPI注解
         if (defaultAnnotation != null) {
             String value = defaultAnnotation.value();
             if ((value = value.trim()).length() > 0) {
                 String[] names = NAME_SEPARATOR.split(value);
+                // 只能有一个默认值：SPI(value="xxx")，默认实现xxx
                 if (names.length > 1) {
                     throw new IllegalStateException("more than 1 default extension name on extension " + type.getName()
                             + ": " + Arrays.toString(names));
@@ -617,6 +650,7 @@ public class ExtensionLoader<T> {
             }
         }
 
+        // 读取三个目录下的spi 配置文件;/META-INF/dubbo/internal, /META-INF/dubbo, /META-INF/services
         Map<String, Class<?>> extensionClasses = new HashMap<String, Class<?>>();
         loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY, type.getName());
         loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY, type.getName().replace("org.apache", "com.alibaba"));
@@ -692,6 +726,8 @@ public class ExtensionLoader<T> {
                     type + ", class line: " + clazz.getName() + "), class "
                     + clazz.getName() + "is not subtype of interface.");
         }
+
+        // 判断实现类是否有@Adaptive注解
         if (clazz.isAnnotationPresent(Adaptive.class)) {
             if (cachedAdaptiveClass == null) {
                 cachedAdaptiveClass = clazz;
@@ -717,6 +753,7 @@ public class ExtensionLoader<T> {
             }
             String[] names = NAME_SEPARATOR.split(name);
             if (names != null && names.length > 0) {
+                // 是否包含@Activate注解
                 Activate activate = clazz.getAnnotation(Activate.class);
                 if (activate != null) {
                     cachedActivates.put(names[0], activate);
@@ -729,10 +766,12 @@ public class ExtensionLoader<T> {
                 }
                 for (String n : names) {
                     if (!cachedNames.containsKey(clazz)) {
+                        // 缓存 实现类Class对象：实现类标识符
                         cachedNames.put(clazz, n);
                     }
                     Class<?> c = extensionClasses.get(n);
                     if (c == null) {
+                        // @Adaptive 和 wapper类 都不在extensionClasses里
                         extensionClasses.put(n, clazz);
                     } else if (c != clazz) {
                         throw new IllegalStateException("Duplicate extension " + type.getName() + " name " + n + " on " + c.getName() + " and " + clazz.getName());
@@ -774,10 +813,13 @@ public class ExtensionLoader<T> {
     }
 
     private Class<?> getAdaptiveExtensionClass() {
+        // 这个方法有可能性触发SPI文件加载，当缓存中没有值得时候，就会加载SPI文件
         getExtensionClasses();
         if (cachedAdaptiveClass != null) {
             return cachedAdaptiveClass;
         }
+
+        // 代表 @Adaptive注解添加在了方法上
         return cachedAdaptiveClass = createAdaptiveExtensionClass();
     }
 

@@ -73,7 +73,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
      *
      * <li>when the url is dubbo://224.5.6.7:1234/org.apache.dubbo.config.api.DemoService?application=dubbo-sample, then
      * the protocol is <b>DubboProtocol</b></li>
-     *
+     * <p>
      * Actually，when the {@link ExtensionLoader} init the {@link Protocol} instants,it will automatically wraps two
      * layers, and eventually will get a <b>ProtocolFilterWrapper</b> or <b>ProtocolListenerWrapper</b>
      */
@@ -309,23 +309,33 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         URL tmpUrl = new URL("temp", "localhost", 0, map);
         final boolean isJvmRefer;
         if (isInjvm() == null) {
+            // url 配置被指定，则不做本地引用
             if (url != null && url.length() > 0) { // if a url is specified, don't do local reference
                 isJvmRefer = false;
             } else {
                 // by default, reference local service if there is
+                // 根据 url 的协议、scope 以及 injvm 等参数检测是否需要本地引用
                 isJvmRefer = InjvmProtocol.getInjvmProtocol().isInjvmRefer(tmpUrl);
             }
         } else {
+            // 获取 injvm 配置值
             isJvmRefer = isInjvm();
         }
 
+        // 本地引用
         if (isJvmRefer) {
             URL url = new URL(Constants.LOCAL_PROTOCOL, NetUtils.LOCALHOST, 0, interfaceClass.getName()).addParameters(map);
             invoker = refprotocol.refer(interfaceClass, url);
             if (logger.isInfoEnabled()) {
                 logger.info("Using injvm service " + interfaceClass.getName());
             }
+
+            // 远程引用
         } else {
+            // url 不为空，表明用户可能想进行点对点调用
+            // 直联消费就是在消费者中直接配置url，不经过注册中心，
+            // 例如  <dubbo:reference id="directService" url="dubbo://localhost:20882" interface="dubbo.direct.provider.DirectService" />
+            // user specified URL, could be peer-to-peer address, or register center's address.
             if (url != null && url.length() > 0) { // user specified URL, could be peer-to-peer address, or register center's address.
                 String[] us = Constants.SEMICOLON_SPLIT_PATTERN.split(url);
                 if (us != null && us.length > 0) {
@@ -341,7 +351,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                         }
                     }
                 }
-            } else { // assemble URL from register center's configuration
+            } else {
+                // assemble URL from register center's configuration  通过注册中心调用
                 checkRegistry();
                 List<URL> us = loadRegistries(false);
                 if (us != null && !us.isEmpty()) {
@@ -358,9 +369,11 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 }
             }
 
+            // 单个注册中心或服务提供者，服务直联
             if (urls.size() == 1) {
                 invoker = refprotocol.refer(interfaceClass, urls.get(0));
             } else {
+                // 多个注册中心或多个服务提供者，或者两者混合
                 List<Invoker<?>> invokers = new ArrayList<Invoker<?>>();
                 URL registryURL = null;
                 for (URL url : urls) {
@@ -404,7 +417,8 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             URL consumerURL = new URL(Constants.CONSUMER_PROTOCOL, map.remove(Constants.REGISTER_IP_KEY), 0, map.get(Constants.INTERFACE_KEY), map);
             metadataReportService.publishConsumer(consumerURL);
         }
-        // create service proxy
+
+        // create service proxy 创建代理对象，当调用目标方法的时候，实际上是在代理类内部通过invoker进行远程调用
         return (T) proxyFactory.getProxy(invoker);
     }
 
@@ -417,14 +431,14 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             return;
         }
         setConsumer(
-                        ConfigManager.getInstance()
-                            .getDefaultConsumer()
-                            .orElseGet(() -> {
-                                ConsumerConfig consumerConfig = new ConsumerConfig();
-                                consumerConfig.refresh();
-                                return consumerConfig;
-                            })
-                );
+                ConfigManager.getInstance()
+                        .getDefaultConsumer()
+                        .orElseGet(() -> {
+                            ConsumerConfig consumerConfig = new ConsumerConfig();
+                            consumerConfig.refresh();
+                            return consumerConfig;
+                        })
+        );
     }
 
     private void completeCompoundConfigs() {

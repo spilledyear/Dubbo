@@ -44,6 +44,8 @@ public class ZkclientZookeeperClient extends AbstractZookeeperClient<IZkChildLis
         super(url);
         long timeout = url.getParameter(Constants.TIMEOUT_KEY, 30000L);
         client = new ZkClientWrapper(url.getBackupAddress(), timeout);
+
+        // 注册监听器，连接相关
         client.addListener(new IZkStateListener() {
             @Override
             public void handleStateChanged(KeeperState state) throws Exception {

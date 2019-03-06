@@ -79,6 +79,7 @@ public final class ClassGenerator {
     }
 
     public static boolean isDynamicClass(Class<?> cl) {
+        // isAssignableFrom 用来判断DC.class和cl是否相同或DC.class是否是cl的超类或接口
         return ClassGenerator.DC.class.isAssignableFrom(cl);
     }
 

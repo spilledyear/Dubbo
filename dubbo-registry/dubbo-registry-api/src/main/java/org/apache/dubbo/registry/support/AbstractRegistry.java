@@ -77,8 +77,11 @@ public abstract class AbstractRegistry implements Registry {
 
     public AbstractRegistry(URL url) {
         setUrl(url);
+
         // Start file save timer
+        // 配置中心的URL中是否配置了同步保存文件属性，否则默认为false
         syncSaveFile = url.getParameter(Constants.REGISTRY_FILESAVE_SYNC_KEY, false);
+        // 配置信息本地缓存的文件名
         String filename = url.getParameter(Constants.FILE_KEY, System.getProperty("user.home") + "/.dubbo/dubbo-registry-" + url.getParameter(Constants.APPLICATION_KEY) + "-" + url.getAddress() + ".cache");
         File file = null;
         if (ConfigUtils.isNotEmpty(filename)) {
@@ -90,7 +93,9 @@ public abstract class AbstractRegistry implements Registry {
             }
         }
         this.file = file;
+        // 如果现有配置缓存，则从缓存文件中加载属性
         loadProperties();
+        // 通知订阅
         notify(url.getBackupUrls());
     }
 

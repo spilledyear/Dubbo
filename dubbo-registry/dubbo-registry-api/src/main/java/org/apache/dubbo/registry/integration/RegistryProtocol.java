@@ -101,6 +101,8 @@ public class RegistryProtocol implements Protocol {
     private final Map<String, ExporterChangeableWrapper<?>> bounds = new ConcurrentHashMap<>();
     private Cluster cluster;
     private Protocol protocol;
+
+    // 对于这属性，我一开始非常不理解这是在什么时候被初始化的。后面想到RegistryProtocol和RegistryFactory都是SPI，而dubbo中的SPI是有IOC功能的，所以这个属性自动注入进来的 RegistryFactory$Adaptive
     private RegistryFactory registryFactory;
     private ProxyFactory proxyFactory;
 
@@ -164,7 +166,9 @@ public class RegistryProtocol implements Protocol {
 
     @Override
     public <T> Exporter<T> export(final Invoker<T> originInvoker) throws RpcException {
+        // 如果是Registry类型的Invoker，就根据URL中的信息获取真正的Registry，比如 zookeeper、dubbo，如果没有就默认为dubbo
         URL registryUrl = getRegistryUrl(originInvoker);
+
         // url to export locally
         URL providerUrl = getProviderUrl(originInvoker);
 
@@ -177,22 +181,43 @@ public class RegistryProtocol implements Protocol {
         overrideListeners.put(overrideSubscribeUrl, overrideSubscribeListener);
 
         providerUrl = overrideUrlWithConfig(providerUrl, overrideSubscribeListener);
-        //export invoker
+
+        //export invoker，交给具体协议去暴露服务，以dubbo协议为例子，创建一个export，缓存到map，
+        // 通过netty监听一个端口，消费者调用的时候根据url找到export，然后执行
         final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker, providerUrl);
 
         // url to registry
+        //根据url获取对应的注册中心服务实例，这里就是ZookeeperRegistry
         final Registry registry = getRegistry(originInvoker);
+
+        //注册到注册中心的URL
         final URL registeredProviderUrl = getRegisteredProviderUrl(providerUrl, registryUrl);
         ProviderInvokerWrapper<T> providerInvokerWrapper = ProviderConsumerRegTable.registerProvider(originInvoker,
                 registryUrl, registeredProviderUrl);
-        //to judge if we need to delay publish
+
+        //to judge if we need to delay publish 判断是否延迟publish
         boolean register = registeredProviderUrl.getParameter("register", true);
         if (register) {
+            /**
+             * 这里以zkz注册中心为例子
+             *
+             * 连接ZK，创建provider在ZK上的节点，注册监听事件IZkStateListener
+             *
+             *
+             * RegistryFactory通过SPI机制的IOC功能自动注入，即 ZookeeperRegistryFactory ，生成ZookeeperRegistryFactory的时候，会注入 ZookeeperTransporter ，也是SPI,根据参数 会生成 ZkclientZookeeperTransporter
+             * 调用getRegistry获取Registry对象的时候，会调用 AbstractRegistryFactory 的getRegistry方法，然后再调用 ZookeeperRegistryFactory 的 createRegistry 方法
+             * 执行createRegistry方法创建了一个ZookeeperRegistry对象，ZookeeperRegistry 构造函数中调用了ZkclientZookeeperTransporter的connect方法，这回生成一个 ZkclientZookeeperClient 对象
+             * ZkclientZookeeperClient构造函数内部会生成 ZkClientWrapper 对象client，然后给client添加 IZkStateListener
+             * ZkClientWrapper 构造函数内部 通过CompletableFuture开启一个异步任务连接ZK
+             * ZkclientZookeeperClient的构造函数内调用ZkClientWrapper的addListener方法时，会调用ZkClient的client.subscribeStateChanges方法注册监听者
+             *
+             */
             register(registryUrl, registeredProviderUrl);
             providerInvokerWrapper.setReg(true);
         }
 
         // Deprecated! Subscribe to override rules in 2.6.x or before.
+        // 先用FailbackRegistry的subscribe，然后调用ZookeeperRegistry的doSubscribe，provider会订阅一些配置节点的变化 configurators
         registry.subscribe(overrideSubscribeUrl, overrideSubscribeListener);
 
         exporter.setRegisterUrl(registeredProviderUrl);
@@ -371,13 +396,17 @@ public class RegistryProtocol implements Protocol {
         Map<String, String> parameters = new HashMap<String, String>(directory.getUrl().getParameters());
         URL subscribeUrl = new URL(CONSUMER_PROTOCOL, parameters.remove(REGISTER_IP_KEY), 0, type.getName(), parameters);
         if (!ANY_VALUE.equals(url.getServiceInterface()) && url.getParameter(REGISTER_KEY, true)) {
+            // 向zk中的consumers节点下写入的URL地址
             registry.register(getRegisteredConsumerUrl(subscribeUrl, url));
         }
         directory.buildRouterChain(subscribeUrl);
+        // 订阅服务地址列表
         directory.subscribe(subscribeUrl.addParameter(CATEGORY_KEY,
                 PROVIDERS_CATEGORY + "," + CONFIGURATORS_CATEGORY + "," + ROUTERS_CATEGORY));
 
+        // 加入集群路由
         Invoker invoker = cluster.join(directory);
+        // 生成invoker，其中缓存了RegistryDirectory(包括服务的所有地址，路由协议之类的)
         ProviderConsumerRegTable.registerConsumer(invoker, url, subscribeUrl, directory);
         return invoker;
     }

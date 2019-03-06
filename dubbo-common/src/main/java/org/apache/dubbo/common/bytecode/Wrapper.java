@@ -104,6 +104,7 @@ public abstract class Wrapper {
      * @return Wrapper instance(not null).
      */
     public static Wrapper getWrapper(Class<?> c) {
+        // 这里通过ClassGenerator的内部类DC来标识动态class，所以只要是ClassGenerator.DC的子类都属于动态类
         while (ClassGenerator.isDynamicClass(c)) // can not wrapper on dynamic class.
         {
             c = c.getSuperclass();
@@ -121,7 +122,14 @@ public abstract class Wrapper {
         return ret;
     }
 
+    /**
+     * 动态生成源代码，然后编译创建对象
+     *
+     * @param c
+     * @return
+     */
     private static Wrapper makeWrapper(Class<?> c) {
+        // 判断Class是否为原始类型：boolean、char、byte、short、int、long、float、double
         if (c.isPrimitive()) {
             throw new IllegalArgumentException("Can not create wrapper for primitive type: " + c);
         }

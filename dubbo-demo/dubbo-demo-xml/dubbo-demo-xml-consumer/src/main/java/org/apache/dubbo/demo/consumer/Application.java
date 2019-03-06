@@ -28,8 +28,20 @@ public class Application {
     public static void main(String[] args) {
         ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("spring/dubbo-consumer.xml");
         context.start();
-        DemoService demoService = context.getBean("demoService", DemoService.class);
-        String hello = demoService.sayHello("world");
-        System.out.println("result: " + hello);
+//        DemoService demoService = context.getBean("demoService", DemoService.class);
+//        String hello = demoService.sayHello("world");
+//        System.out.println("result: " + hello);
+
+
+        DemoService demoService = (DemoService) context.getBean("demoService"); // get remote service proxy
+        while (true) {
+            try {
+                Thread.sleep(1000);
+                String hello = demoService.sayHello("world"); // call remote method
+                System.out.println(hello); // get result
+            } catch (Throwable throwable) {
+                throwable.printStackTrace();
+            }
+        }
     }
 }

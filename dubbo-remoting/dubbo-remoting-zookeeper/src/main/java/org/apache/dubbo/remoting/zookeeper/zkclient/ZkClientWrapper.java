@@ -44,12 +44,14 @@ public class ZkClientWrapper {
 
     public ZkClientWrapper(final String serverAddr, long timeout) {
         this.timeout = timeout;
+        // 异步连接ZK  通使用了ZkClient
         completableFuture = CompletableFuture.supplyAsync(() -> new ZkClient(serverAddr, Integer.MAX_VALUE));
     }
 
     public void start() {
         if (!started) {
             try {
+                // 阻塞
                 client = completableFuture.get(timeout, TimeUnit.MILLISECONDS);
 //                this.client.subscribeStateChanges(IZkStateListener);
             } catch (Throwable t) {
@@ -63,6 +65,7 @@ public class ZkClientWrapper {
     }
 
     public void addListener(IZkStateListener listener) {
+        // whenComplete是非阻塞的
         completableFuture.whenComplete((value, exception) -> {
             this.makeClientReady(value, exception);
             if (exception == null) {

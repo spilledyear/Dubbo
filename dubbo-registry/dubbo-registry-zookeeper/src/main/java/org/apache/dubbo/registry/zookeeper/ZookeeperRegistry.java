@@ -61,12 +61,19 @@ public class ZookeeperRegistry extends FailbackRegistry {
         if (url.isAnyHost()) {
             throw new IllegalStateException("registry address == null");
         }
+        // 获得到注册中心中的分组，默认dubbo
         String group = url.getParameter(Constants.GROUP_KEY, DEFAULT_ROOT);
         if (!group.startsWith(Constants.PATH_SEPARATOR)) {
             group = Constants.PATH_SEPARATOR + group;
         }
         this.root = group;
+
+        // ZookeeperTransport这里是生成的自适应实现，默认使用ZkClientZookeeperTransporter，返回ZkClientZookeeperClient
+        // 在创建的时候会创建ZkClientWrapper，而在ZkClientWrapper的构造函数中会异步连接ZK
         zkClient = zookeeperTransporter.connect(url);
+
+        // ZkClientZookeeperClient添加状态改变监听器， 只是添加一个listern
+        // 调用ZkclientZookeeperClient的addStateListener方法，然后调用 AbstractZookeeperClient 的 addStateListener 方法
         zkClient.addStateListener(new StateListener() {
             @Override
             public void stateChanged(int state) {
@@ -154,6 +161,10 @@ public class ZookeeperRegistry extends FailbackRegistry {
                     zkListener = listeners.get(listener);
                 }
                 zkClient.create(root, false);
+
+                // 这部分很关键啊！dubbo不仅自己维护了一套listener，同时这个listener也ZkClient的listern，所以节点信息发生变动的时候会触发listern里面的逻辑
+                // 这里饶了很大一圈 AbstractZookeeperClient#addChildListener => ZkclientZookeeperClient#addTargetChildListener =>
+                // ZkClientWrapper#subscribeChildChanges => ZkClient#subscribeChildChanges
                 List<String> services = zkClient.addChildListener(root, zkListener);
                 if (services != null && !services.isEmpty()) {
                     for (String service : services) {

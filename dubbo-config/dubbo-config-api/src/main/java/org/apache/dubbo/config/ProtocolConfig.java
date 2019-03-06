@@ -180,6 +180,7 @@ public class ProtocolConfig extends AbstractConfig {
      * whether it is a persistent connection
      */
     //TODO add this to provider config
+    // 是否长连接
     private Boolean keepAlive;
 
     // TODO add this to provider config

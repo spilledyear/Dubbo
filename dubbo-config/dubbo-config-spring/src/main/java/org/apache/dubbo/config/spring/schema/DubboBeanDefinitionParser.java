@@ -72,8 +72,12 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
     @SuppressWarnings("unchecked")
     private static BeanDefinition parse(Element element, ParserContext parserContext, Class<?> beanClass, boolean required) {
         RootBeanDefinition beanDefinition = new RootBeanDefinition();
+        // 这里的beanClass主要有：ApplicationConfig.class、ModuleConfig.class、RegistryConfig.class、MonitorConfig.class、ProviderConfig.class、
+        // ConsumerConfig.class、ServiceBean.class、ReferenceBean.class
         beanDefinition.setBeanClass(beanClass);
         beanDefinition.setLazyInit(false);
+
+        // 处理标签中的id，如果id设置为必输但又没有给值，则取name属性的值，如果name属性也没有值，则不同beanClass有不同的取值逻辑
         String id = element.getAttribute("id");
         if ((id == null || id.length() == 0) && required) {
             String generatedBeanName = element.getAttribute("name");
@@ -93,6 +97,8 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                 id = generatedBeanName + (counter++);
             }
         }
+
+        // 如果有多个相同的id，抛IllegalStateException异常
         if (id != null && id.length() > 0) {
             if (parserContext.getRegistry().containsBeanDefinition(id)) {
                 throw new IllegalStateException("Duplicate spring bean id " + id);
@@ -100,6 +106,8 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
             parserContext.getRegistry().registerBeanDefinition(id, beanDefinition);
             beanDefinition.getPropertyValues().addPropertyValue("id", id);
         }
+
+        // 当beanClass为ProtocolConfig.class
         if (ProtocolConfig.class.equals(beanClass)) {
             for (String name : parserContext.getRegistry().getBeanDefinitionNames()) {
                 BeanDefinition definition = parserContext.getRegistry().getBeanDefinition(name);
@@ -111,7 +119,12 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                     }
                 }
             }
-        } else if (ServiceBean.class.equals(beanClass)) {
+
+
+        }
+
+        // 当beanClass为ServiceBean.class
+        else if (ServiceBean.class.equals(beanClass)) {
             String className = element.getAttribute("class");
             if (className != null && className.length() > 0) {
                 RootBeanDefinition classDefinition = new RootBeanDefinition();
@@ -120,20 +133,32 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                 parseProperties(element.getChildNodes(), classDefinition);
                 beanDefinition.getPropertyValues().addPropertyValue("ref", new BeanDefinitionHolder(classDefinition, id + "Impl"));
             }
-        } else if (ProviderConfig.class.equals(beanClass)) {
+        }
+
+        // 当beanClass为ProviderConfig.class
+        else if (ProviderConfig.class.equals(beanClass)) {
             parseNested(element, parserContext, ServiceBean.class, true, "service", "provider", id, beanDefinition);
-        } else if (ConsumerConfig.class.equals(beanClass)) {
+        }
+
+        // 当beanClass为ConsumerConfig.class
+        else if (ConsumerConfig.class.equals(beanClass)) {
             parseNested(element, parserContext, ReferenceBean.class, false, "reference", "consumer", id, beanDefinition);
         }
+
+        // 以下的逻辑主要用于获取一些属性的值，然后存到MutablePropertyValues中的 List<PropertyValue> propertyValueList。一个属性对应一个
         Set<String> props = new HashSet<String>();
         ManagedMap parameters = null;
         for (Method setter : beanClass.getMethods()) {
             String name = setter.getName();
+
+            // 获取beanClass中的所有 public、只有一个参数 并且以set开头的方法
             if (name.length() > 3 && name.startsWith("set")
                     && Modifier.isPublic(setter.getModifiers())
                     && setter.getParameterTypes().length == 1) {
                 Class<?> type = setter.getParameterTypes()[0];
                 String beanProperty = name.substring(3, 4).toLowerCase() + name.substring(4);
+
+                // 这里就是为了得到要注入对象的属性名，但是有一点要注意：属性 name => name；属性 userName => user-name
                 String property = StringUtils.camelToSplitName(beanProperty, "-");
                 props.add(property);
                 Method getter = null;
@@ -150,6 +175,8 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                         || !type.equals(getter.getReturnType())) {
                     continue;
                 }
+
+                // 和dubbo中的一些标签属性相关
                 if ("parameters".equals(property)) {
                     parameters = parseParameters(element.getChildNodes(), beanDefinition);
                 } else if ("methods".equals(property)) {
@@ -157,6 +184,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                 } else if ("arguments".equals(property)) {
                     parseArguments(id, element.getChildNodes(), beanDefinition, parserContext);
                 } else {
+                    // 获取标签中所配置的属性值
                     String value = element.getAttribute(property);
                     if (value != null) {
                         value = value.trim();

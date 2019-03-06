@@ -109,6 +109,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
             if (logger.isInfoEnabled()) {
                 logger.info("The service ready on spring started. service: " + getInterface());
             }
+            // 暴露服务， 该方法位于ServiceConfig中
             export();
         }
     }
@@ -117,7 +118,9 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
     @SuppressWarnings({"unchecked", "deprecation"})
     public void afterPropertiesSet() throws Exception {
         if (getProvider() == null) {
+            // 获取applicationContext中所有类型为ProviderConfig.class的Bean
             Map<String, ProviderConfig> providerConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProviderConfig.class, false, false);
+            // 如果有配置<dubbo:provider/>
             if (providerConfigMap != null && providerConfigMap.size() > 0) {
                 Map<String, ProtocolConfig> protocolConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProtocolConfig.class, false, false);
                 if ((protocolConfigMap == null || protocolConfigMap.size() == 0)
@@ -295,6 +298,8 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                 setPath(beanName);
             }
         }
+
+        // isDelay用于判断是否延迟发布服务，先从ServiceConfig获取delay属性，如果为null则获取ProviderConfig的delay属性，最后如果还是null或配置为-1表示延迟暴露服务。
         if (!supportedApplicationListener) {
             export();
         }

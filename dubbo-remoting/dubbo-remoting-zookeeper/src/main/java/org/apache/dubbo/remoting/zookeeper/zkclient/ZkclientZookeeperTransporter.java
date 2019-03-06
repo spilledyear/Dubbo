@@ -23,6 +23,7 @@ import org.apache.dubbo.remoting.zookeeper.support.AbstractZookeeperTransporter;
 public class ZkclientZookeeperTransporter extends AbstractZookeeperTransporter {
 
     public ZookeeperClient createZookeeperClient(URL url) {
+        // 在创建的时候会创建ZkClientWrapper，而在ZkClientWrapper的构造函数中会异步连接ZK
         return new ZkclientZookeeperClient(url);
     }
 

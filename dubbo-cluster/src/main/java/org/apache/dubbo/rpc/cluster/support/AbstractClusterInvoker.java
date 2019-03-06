@@ -227,6 +227,7 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
 
     @Override
     public Result invoke(final Invocation invocation) throws RpcException {
+        // 判断当前Invoker是否被销毁，如果销毁直接抛出异常
         checkWhetherDestroyed();
 
         // binding attachments into invocation.
@@ -235,7 +236,9 @@ public abstract class AbstractClusterInvoker<T> implements Invoker<T> {
             ((RpcInvocation) invocation).addAttachments(contextAttachments);
         }
 
+        // 查找所有的invoker，即有几个节点
         List<Invoker<T>> invokers = list(invocation);
+        // 通过SPI加载负载均衡的扩展。如果invoke为空，则使用默认的RandomLoadBalance；如果invoke不为空，根据invocation和第一个invoker的url选择负载均衡器
         LoadBalance loadbalance = initLoadBalance(invokers, invocation);
         RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
         return doInvoke(invocation, invokers, loadbalance);
