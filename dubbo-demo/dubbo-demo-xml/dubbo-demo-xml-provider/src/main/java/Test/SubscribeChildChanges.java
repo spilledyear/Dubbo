@@ -1,4 +1,4 @@
-package org.apache.dubbo.demo.provider;
+package Test;
 
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.ZkConnection;

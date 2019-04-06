@@ -1,4 +1,4 @@
-package org.apache.dubbo.demo.provider;
+package Test;
 
 import org.junit.jupiter.api.Test;
 
