@@ -82,6 +82,7 @@ public class ExtensionLoader<T> {
 
     // ==============================
 
+    // 接口对应的Class对象，每个接口对应一个ExtensionLoader实例
     private final Class<?> type;
 
     private final ExtensionFactory objectFactory;
@@ -546,6 +547,12 @@ public class ExtensionLoader<T> {
         }
     }
 
+    /**
+     * 依赖注入， 可以注入 spring的bean 和 SPI的adaptive
+     *
+     * @param instance
+     * @return
+     */
     private T injectExtension(T instance) {
         try {
             if (objectFactory != null) {
