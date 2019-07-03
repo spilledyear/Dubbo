@@ -16,6 +16,7 @@
  */
 package org.apache.dubbo.demo.provider;
 
+import org.apache.dubbo.demo.DemoService;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 public class Application {
@@ -27,5 +28,18 @@ public class Application {
         ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("spring/dubbo-provider.xml");
         context.start();
         System.in.read();
+
+
+        // 可用于测试本地调用
+        DemoService demoService = (DemoService) context.getBean("demoService2");
+        while (true) {
+            try {
+                Thread.sleep(1000);
+                String hello = demoService.sayHello("world");
+                System.out.println(hello);
+            } catch (Throwable throwable) {
+                throwable.printStackTrace();
+            }
+        }
     }
 }

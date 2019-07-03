@@ -54,7 +54,7 @@ import static org.apache.dubbo.common.constants.RegistryConstants.ROUTERS_CATEGO
 
 /**
  * ZookeeperRegistry
- *
+ * in dubbo2.7.2，ZookeeperTransporter 只有一个实现类 CuratorZookeeperTransporter 了， 之前的 ZkclientZookeeperTransporter 移除了，即不适用原生的ZkClient了
  */
 public class ZookeeperRegistry extends FailbackRegistry {
 
@@ -86,6 +86,7 @@ public class ZookeeperRegistry extends FailbackRegistry {
         zkClient.addStateListener(state -> {
             if (state == StateListener.RECONNECTED) {
                 try {
+                    // 断开之后重连接
                     recover();
                 } catch (Exception e) {
                     logger.error(e.getMessage(), e);
