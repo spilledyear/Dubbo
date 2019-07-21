@@ -18,6 +18,8 @@
  */
 package org.apache.dubbo.demo.provider;
 
+import org.apache.dubbo.config.ConfigCenterConfig;
+import org.apache.dubbo.config.MetadataReportConfig;
 import org.apache.dubbo.config.RegistryConfig;
 import org.apache.dubbo.config.spring.context.annotation.EnableDubbo;
 
@@ -46,6 +48,24 @@ public class Application {
             RegistryConfig registryConfig = new RegistryConfig();
             registryConfig.setAddress("zookeeper://10.9.44.133:2181");
             return registryConfig;
+        }
+
+        @Bean
+        public MetadataReportConfig metadataReportConfig() {
+            MetadataReportConfig metadataReportConfig = new MetadataReportConfig();
+//            metadataReportConfig.setAddress("nacos://10.9.44.133:8848");
+            metadataReportConfig.setAddress("zookeeper://10.9.44.133:2181");
+//            metadataReportConfig.setAddress("redis://localhost:6379");
+            return metadataReportConfig;
+        }
+
+
+        @Bean
+        public ConfigCenterConfig configCenterConfig() {
+            ConfigCenterConfig configCenterConfig = new ConfigCenterConfig();
+//            configCenterConfig.setAddress("nacos://10.9.44.133:8848");
+            configCenterConfig.setAddress("zookeeper://10.9.44.133:2181");
+            return configCenterConfig;
         }
     }
 }

@@ -24,10 +24,15 @@ import org.apache.dubbo.rpc.RpcContext;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 
 @Service
 public class DemoServiceImpl implements DemoService {
     private static final Logger logger = LoggerFactory.getLogger(DemoServiceImpl.class);
+
+    @Autowired
+    ApplicationContext context;
 
     @Override
     public String sayHello(String name) {
