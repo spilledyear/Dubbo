@@ -341,11 +341,11 @@ public final class ClassGenerator {
                 }
             }
             Class<?> wc = mCtc.toClass(loader, pd);
-//            try {
-//                mCtc.writeFile();
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
+            try {
+                mCtc.writeFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             return wc;
 //            return mCtc.toClass(loader, pd);
         } catch (RuntimeException e) {

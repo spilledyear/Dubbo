@@ -53,8 +53,8 @@ public class Application {
         @Bean
         public MetadataReportConfig metadataReportConfig() {
             MetadataReportConfig metadataReportConfig = new MetadataReportConfig();
-//            metadataReportConfig.setAddress("nacos://10.9.44.133:8848");
             metadataReportConfig.setAddress("zookeeper://10.9.44.133:2181");
+//            metadataReportConfig.setAddress("nacos://10.9.44.133:8848");
 //            metadataReportConfig.setAddress("redis://localhost:6379");
             return metadataReportConfig;
         }
@@ -63,8 +63,8 @@ public class Application {
         @Bean
         public ConfigCenterConfig configCenterConfig() {
             ConfigCenterConfig configCenterConfig = new ConfigCenterConfig();
-//            configCenterConfig.setAddress("nacos://10.9.44.133:8848");
             configCenterConfig.setAddress("zookeeper://10.9.44.133:2181");
+//            configCenterConfig.setAddress("nacos://10.9.44.133:8848");
             return configCenterConfig;
         }
     }
