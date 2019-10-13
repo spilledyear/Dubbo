@@ -23,6 +23,8 @@ import org.apache.dubbo.config.ReferenceConfig;
 import org.apache.dubbo.config.RegistryConfig;
 import org.apache.dubbo.demo.DemoService;
 
+import java.util.concurrent.CompletableFuture;
+
 public class Application {
     /**
      * In order to make sure multicast registry works, need to specify '-Djava.net.preferIPv4Stack=true' before
@@ -31,10 +33,22 @@ public class Application {
     public static void main(String[] args) {
         ReferenceConfig<DemoService> reference = new ReferenceConfig<>();
         reference.setApplication(new ApplicationConfig("dubbo-demo-api-consumer"));
-        reference.setRegistry(new RegistryConfig("multicast://224.5.6.7:1234"));
+        reference.setRegistry(new RegistryConfig("zookeeper://10.9.15.32:2181"));
         reference.setInterface(DemoService.class);
+        reference.setCheck(false);
         DemoService service = reference.get();
         String message = service.sayHello("dubbo");
         System.out.println(message);
+
+        CompletableFuture future = service.asyncSay("呵呵");
+        System.out.println("获取到future");
+
+        future.whenComplete((v, e) -> {
+            if (e != null) {
+                System.out.println("异常 " + e);
+            } else {
+                System.out.println(v);
+            }
+        });
     }
 }
