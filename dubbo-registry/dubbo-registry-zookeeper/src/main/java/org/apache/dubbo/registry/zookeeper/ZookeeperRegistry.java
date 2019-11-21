@@ -174,7 +174,7 @@ public class ZookeeperRegistry extends FailbackRegistry {
                         listeners.putIfAbsent(listener, (parentPath, currentChilds) -> ZookeeperRegistry.this.notify(url, listener, toUrlsWithEmpty(url, parentPath, currentChilds)));
                         zkListener = listeners.get(listener);
                     }
-                    zkClient.create(path, false);
+                    zkClient.create(path, false); // 要监听的节点，以consumer为例子 /dubbo/service/providers、/dubbo/service/routers、/dubbo/service/configurations
                     List<String> children = zkClient.addChildListener(path, zkListener);
                     if (children != null) {
                         urls.addAll(toUrlsWithEmpty(url, path, children));
