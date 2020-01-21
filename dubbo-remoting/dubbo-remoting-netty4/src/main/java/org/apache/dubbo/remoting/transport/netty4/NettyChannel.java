@@ -132,6 +132,7 @@ final class NettyChannel extends AbstractChannel {
         int timeout = 0;
         try {
             ChannelFuture future = channel.writeAndFlush(message);
+            // 如果配置了 send=true 参数，客户端需要等待消息发出之后再返回
             if (sent) {
                 // wait timeout ms
                 timeout = getUrl().getPositiveParameter(TIMEOUT_KEY, DEFAULT_TIMEOUT);
